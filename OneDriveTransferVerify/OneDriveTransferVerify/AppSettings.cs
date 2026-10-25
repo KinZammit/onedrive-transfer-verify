@@ -2,6 +2,7 @@
 {
     internal class AppSettings
     {
-        public string ClientId { get; init; }
+        public required string ClientId { get; init; }
+        public required string FolderName { get; init; }
     }
 }

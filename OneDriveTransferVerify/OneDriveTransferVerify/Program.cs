@@ -1,7 +1,5 @@
-﻿using Microsoft.Identity.Client;
-using OneDriveTransferVerify;
+﻿using OneDriveTransferVerify;
 using OneDriveTransferVerify.Services;
-using System.Net.Http.Headers;
 using System.Text.Json;
 
 var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
@@ -13,16 +11,19 @@ var token = await authService.GetAccessTokenAsync();
 
 var client = new GraphClient(authService);
 
+//For Testing - not required
 var me = await client.GetCurrentUserAsync();
 Console.WriteLine(me);
 
+var exists = await client.FolderExistsAsync(settings.FolderName);
+if(!exists)
+{
+    await client.CreateFolderAsync(settings.FolderName);
+    Console.WriteLine("Folder Created");
+}
 
-//var client = new HttpClient();
-//client.BaseAddress = new Uri("https://graph.microsoft.com/v1.0/");
-//client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+else
+{
+    Console.WriteLine("Folder already exists");
+}
 
-//var response = await client.GetAsync("me");
-
-//var body = await response.Content.ReadAsStringAsync();
-//Console.WriteLine($"{(int)response.StatusCode} {response.StatusCode}");
-//Console.WriteLine(body);
