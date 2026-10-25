@@ -11,12 +11,18 @@ var settings = JsonSerializer.Deserialize<AppSettings>(json);
 var authService = new AuthService(settings.ClientId);
 var token = await authService.GetAccessTokenAsync();
 
-var client = new HttpClient();
-client.BaseAddress = new Uri("https://graph.microsoft.com/v1.0/");
-client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+var client = new GraphClient(authService);
 
-var response = await client.GetAsync("me");
+var me = await client.GetCurrentUserAsync();
+Console.WriteLine(me);
 
-var body = await response.Content.ReadAsStringAsync();
-Console.WriteLine($"{(int)response.StatusCode} {response.StatusCode}");
-Console.WriteLine(body);
+
+//var client = new HttpClient();
+//client.BaseAddress = new Uri("https://graph.microsoft.com/v1.0/");
+//client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+//var response = await client.GetAsync("me");
+
+//var body = await response.Content.ReadAsStringAsync();
+//Console.WriteLine($"{(int)response.StatusCode} {response.StatusCode}");
+//Console.WriteLine(body);
