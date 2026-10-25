@@ -11,4 +11,10 @@
     <PackageReference Include="Microsoft.Identity.Client" Version="4.91.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
