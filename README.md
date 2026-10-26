@@ -1,5 +1,62 @@
 # OneDrive Transfer Verify
 
+## How to run
+
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download)
+- A Microsoft account. A **personal account** (e.g. outlook.com) is recommended.
+
+### 1. Code
+```
+git clone https://github.com/KinZammit/onedrive-transfer-verify.git
+cd onedrive-transfer-verify
+```
+
+### 2. Run
+**Visual Studio:** open `OneDriveTransferVerify/OneDriveTransferVerify.sln` and press **F5**.
+
+**Command line** (from the repository root):
+```
+dotnet run --project OneDriveTransferVerify/OneDriveTransferVerify
+```
+
+### 3. Sign in
+- A browser window opens. Sign in with **your own** Microsoft account.
+- A consent screen asks for permission to read your profile and access your files. It shows the app as **unverified**; this is expected for a personal app registration.
+- The file is uploaded to **your** OneDrive, into the folder set in `appsettings.json` Under `UploadFolderName`.
+
+### 4. Expected output
+```
+<original SHA-256 hash>
+<signed-in user profile, used to confirm sign-in>
+Folder already exists          (or: Folder Created)
+Uploaded sample.txt - File was created          (or: File was replaced)
+Downloaded to: C:\Users\<you>\AppData\Local\Temp\OneDriveTaskDownload\sample.txt
+<original SHA-256 hash>
+<download SHA-256 hash>
+File transferred correctly
+```
+Exit code **0** when the hashes match, **1** when they don't or an error occurs.
+
+### Notes
+- You need to sign in on **every run** (the token cache is kept in memory only).
+- The uploaded file stays in your OneDrive; you can delete the folder afterwards.
+
+## Configuration
+
+Settings are in `OneDriveTransferVerify/OneDriveTransferVerify/appsettings.json`.
+All three are **required**; the app stops with an error if any is missing or empty.
+
+| Key | Meaning | Value in repo |
+|---|---|---|
+| `ClientId` | Application (client) ID of the Microsoft Entra app registration | `7667b210-…` |
+| `UploadFolderName` | Folder in the **OneDrive root** where the file is uploaded (created if missing) | `TransferVerify` |
+| `DownloadFolderName` | Sub-folder created under the system **temp** folder where the file is downloaded | `OneDriveTaskDownload` |
+
+### File to upload
+The app uploads `sample.txt`, which sits next to `Program.cs` and is copied to the output folder on build.
+To test another file (e.g. a binary file), replace `sample.txt` with it, keeping the same name, and rebuild.
+
 ## Setup: How I set up the project
 
 ### Personal development/testing approach - Dedicated test Microsoft account
@@ -18,25 +75,19 @@ Platform: public client with redirect URI `http://localhost`
 Choice: Interactive browser. Decided this based on a quick search on best safety measures
 
 
-## Planned flow
-Config: 
-- Client ID (App registration)
-- Intended Folder -> TransferVerify
-- Sample File to Upload
+## Flow
 
-Authentication - MSAL Library:
-- check if a valid token is cached
-- No valid token -> Sign in via Entra (through Interactive browser): This caches the tokens
-
-Graph API:
-- Does Intended Folder exist?
-- No Folder -> Create Folder
-- Upload file -> capture response
-- Download file to local temp folder
-
-Local Verification:
-- Verify with sha256 both files
-- assert hashes and report
+1. Load `appsettings.json` (`ClientId`, `UploadFolderName`, `DownloadFolderName`).
+2. Compute the **SHA-256 of the original file** first, before the transfer starts. This way, if the file changes during the run (or a bug overwrites it), the result is a mismatch rather than a false pass.
+3. **Sign in** (`AuthService`, MSAL): try a cached token silently; if there is none, open the browser for interactive sign-in.
+4. **Ensure the folder exists** (`GraphClient`):
+   - `FolderExistsAsync`: `GET /me/drive/root:/{folder}`. 200 = exists, 404 = doesn't exist.
+   - If it doesn't exist, `CreateFolderAsync`: `POST /me/drive/root/children` with `conflictBehavior: fail`.
+     A 409 (the folder was created in the meantime) is treated as success, so existing content is never replaced.
+5. **Upload** the file: `PUT /me/drive/root:/{folder}/{file}:/content` with the raw bytes (`application/octet-stream`). 201 = new file, 200 = replaced existing file.
+6. **Size check:** the size returned by Graph must equal the local file size (early detection of truncation).
+7. **Download** by the item ID returned from the upload: `GET /me/drive/items/{id}/content` into a temp sub-folder. The redirect to the pre-authenticated download URL is followed automatically. The download path is checked to never be the original file.
+8. **Verify:** compute the SHA-256 of the downloaded file and compare it with the original: **match → exit code 0**, mismatch → exit code 1.
 
 
 ## Key Terms
@@ -53,6 +104,7 @@ Local Verification:
 | **ID token** | Describes the signed-in user (result of authentication) |
 | **Access token** | Short-lived Credential sent to Graph |
 | **Refresh token** | Lets MSAL get new access tokens without another sign-in |
+| **CORS** | Cross-Origin Resource Sharing: a browser security rule that only lets a web page read responses from another site if that site allows it. Encountered while testing downloads in Graph Explorer: the download redirect goes to a storage host that doesn't allow Graph Explorer's site, so the browser blocked the response. It doesn't affect this console app (CORS only applies to browsers). |
 
 ## Links
 
