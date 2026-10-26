@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace OneDriveTransferVerify.Services
 {
@@ -69,6 +70,37 @@ namespace OneDriveTransferVerify.Services
                     response.StatusCode);
             }
 
+        }
+
+        public async Task<(DriveItem Item, bool Created)> UploadAsync(string folderName, string filePath)
+        {
+            var fileName = Path.GetFileName(filePath);
+
+            await using var fileStream = File.OpenRead(filePath);
+
+            using var request = new HttpRequestMessage(HttpMethod.Put, $"me/drive/root:/{Uri.EscapeDataString(folderName)}/{Uri.EscapeDataString(fileName)}:/content");
+
+            request.Content = new StreamContent(fileStream); //as per docs: file is the body
+            //This was researched since assignment specified: e.g., a sample text or binary file)
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+            var response = await SendAuthorizedRequestAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException(
+                    $"File failed to upload: {(int)response.StatusCode} {response.StatusCode}. {error}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var item = await response.Content.ReadFromJsonAsync<DriveItem>()
+                ?? throw new HttpRequestException("Upload should return Drive Item");
+
+            var created = response.StatusCode == HttpStatusCode.Created;
+
+            return (item, created);
         }
 
         //All Requests are sent through this helper to avoid repetition
