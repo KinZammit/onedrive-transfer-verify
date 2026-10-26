@@ -103,6 +103,27 @@ namespace OneDriveTransferVerify.Services
             return (item, created);
         }
 
+        public async Task DownloadAsync(string itemId, string destinationPath)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"me/drive/items/{Uri.EscapeDataString(itemId)}/content");
+            Console.WriteLine(request.RequestUri);
+
+            var response = await SendAuthorizedRequestAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException(
+                    $"File failed to download: {(int)response.StatusCode} {response.StatusCode}. {error}",
+                    null,
+                    response.StatusCode);
+            }
+
+            await using var downloadStream = await response.Content.ReadAsStreamAsync();
+            await using var fileStream = File.Create(destinationPath);
+            await downloadStream.CopyToAsync(fileStream); //Copies the file in batches (streams)
+        }
+
         //All Requests are sent through this helper to avoid repetition
         private async Task<HttpResponseMessage> SendAuthorizedRequestAsync(HttpRequestMessage request)
         {
