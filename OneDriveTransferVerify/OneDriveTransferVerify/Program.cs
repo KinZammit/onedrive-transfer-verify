@@ -60,5 +60,15 @@ if (string.Equals(
 await graphClient.DownloadAsync(uploaded.Id, downloadPath);
 Console.WriteLine($"Downloaded to: {downloadPath}");
 
-return 0;
-    
+var downloadedHash = await FileHasher.ComputeSha256Async(downloadPath);
+Console.WriteLine($"Original hash: {originalHash}");
+Console.WriteLine($"downloaded hash: {downloadedHash}");
+
+if (string.Equals(originalHash, downloadedHash, StringComparison.Ordinal))
+{
+    Console.WriteLine("File transferred correctly");
+    return 0;
+}
+
+Console.WriteLine("File was altered during transfer");
+return 1;
